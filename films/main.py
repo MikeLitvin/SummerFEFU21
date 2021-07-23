@@ -1,10 +1,11 @@
 import sys
 from itertools import groupby
+from interface import Ui_Films
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QTableWidgetItem, QVBoxLayout, QLineEdit, QComboBox, \
-    QLabel
-from PyQt5 import uic
+    QLabel, QSpinBox
+from PyQt5 import uic, QtCore
 import sqlite3
 
 con = sqlite3.connect("films.db")
@@ -34,8 +35,10 @@ class AddFilm(QWidget):
         self.add_save_button = QPushButton('Сохранить', clicked=self.save_film)
         self.add_back_button = QPushButton('Отменить', clicked=self.close_window)
         self.film_name_field = QLineEdit()
-        self.film_year_field = QLineEdit()
-        self.film_duration_field = QLineEdit()
+        self.film_year_field = QSpinBox()
+        self.film_year_field.setMaximum(2021)
+        self.film_duration_field = QSpinBox()
+        self.film_duration_field.setMaximum(1000)
         self.film_genre_box = QComboBox()
         self.film_name_label = QLabel('Название')
         self.film_year_label = QLabel('Год')
@@ -57,26 +60,28 @@ class AddFilm(QWidget):
         self.setLayout(layout)
 
         self.name = self.film_name_field.text()
-        self.year = self.film_year_field.text()
-        self.duration = self.film_duration_field.text()
+        self.year = self.film_year_field.value()
+        self.duration = self.film_duration_field.value()
         self.genre = self.film_genre_box.currentText()
 
     def save_film(self):
-        cur.execute(f"""INSERT INTO Films(title, year, genre, duration)
-         VALUES((?), (?), (?), (?))""", (self.name, self.year, get_id_by_genre(self.genre), self.duration))
+        current_film_id = list(cur.execute("""SELECT COUNT(*) FROM Films""").fetchone())[0] + 1000
+        cur.execute(f"""INSERT INTO Films(id, title, year, genre, duration)
+        VALUES(?, ?, ?, ?, ?)""", (current_film_id, self.name, self.year, get_id_by_genre(self.genre), self.duration))
+        con.commit()
         self.close()
 
     def close_window(self):
         self.close()
 
 
-class Films(QWidget):
+class Films(QWidget, Ui_Films):
     def __init__(self):
         super().__init__()
-        uic.loadUi('interface.ui', self)
         self.initUI()
 
     def initUI(self):
+        self.setupUi(self)
         self.genre_box.addItem('')
         self.setWindowTitle('Films')
         for elem in genres:
@@ -128,6 +133,10 @@ class Films(QWidget):
                 if column == 3:
                     data = cur.execute("""SELECT title FROM genres WHERE id = {}""".format(data)).fetchone()
                     cell = QTableWidgetItem(str(data)[2:-3])
+                    self.tableWidget.setItem(row, column, cell)
+                elif column == 0:
+                    cell = QTableWidgetItem(str(data))
+                    cell.setFlags(QtCore.Qt.ItemIsEnabled)
                     self.tableWidget.setItem(row, column, cell)
                 else:
                     cell = QTableWidgetItem(str(data))
